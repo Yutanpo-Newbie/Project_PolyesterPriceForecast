@@ -4,10 +4,10 @@ from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error
 from xgboost import XGBRegressor
 
-# データ読み込み
+# load
 df = pd.read_csv("../Data/AllData_PolyesterForecast.csv")
 
-# period を Date に変換
+# convert "period" to Date
 df['Date'] = pd.to_datetime(df['period'].astype(str), format='%Y%m')
 df = df.sort_values('Date')
 
@@ -24,7 +24,7 @@ log_cols = [
 for col in log_cols:
     df[f"log_{col}"] = np.log(df[col])
 
-# 目的変数（ポリエステル価格）
+# target values
 y = df["log_Polyester_yarn_price"]
 
 df["log_Polyester_yarn_price_lag1"] = df["log_Polyester_yarn_price"].shift(1)
@@ -32,9 +32,10 @@ df_lag = df.dropna().reset_index(drop=True)
 
 target_col = "log_Polyester_yarn_price"
 
-# 説明変数（必要に応じて調整可能）
+# feature values
 feature_cols = [
     "log_Polyester_yarn_price_lag1",
+    "hs61_Vietnam_ExpPrice",
     "log_PTA_price",
     "log_MEG_price",
     "log_Global_clothing_export",
@@ -46,8 +47,6 @@ feature_cols = [
 X = df_lag[feature_cols]
 y = df_lag[target_col]
 
-
-#モデル構築
 def make_model():
     return XGBRegressor(
         objective="reg:squarederror",
@@ -59,8 +58,8 @@ def make_model():
         random_state=42
     )
 
-# ===== 時系列Cross Validation =====
-n_splits = 5  # 5分割が定番。データが少なければ3でもOK
+# Cross Validation
+n_splits = 5 
 tscv = TimeSeriesSplit(n_splits=n_splits)
 
 fold_results = []
@@ -74,7 +73,6 @@ for fold, (train_idx, val_idx) in enumerate(tscv.split(X), start=1):
 
     y_pred_log = model.predict(X_val)
 
-    # log -> 元スケールへ
     y_val_real = np.exp(y_val.values)
     y_pred_real = np.exp(y_pred_log)
 
@@ -94,6 +92,6 @@ for fold, (train_idx, val_idx) in enumerate(tscv.split(X), start=1):
 results_df = pd.DataFrame(fold_results)
 print(results_df[["fold","train_start","train_end","val_start","val_end","rmse","mape"]])
 
-print("\nCV平均:")
+print("\nCV average:")
 print("RMSE mean:", results_df["rmse"].mean(), " / std:", results_df["rmse"].std())
 print("MAPE mean:", results_df["mape"].mean(), " / std:", results_df["mape"].std())

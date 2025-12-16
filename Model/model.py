@@ -90,7 +90,7 @@ for fold, (train_idx, val_idx) in enumerate(tscv.split(X), start=1):
     })
 
 results_df = pd.DataFrame(fold_results)
-print(results_df[["fold","train_start","train_end","val_start","val_end","rmse","mape"]])
+print(results_df[["fold", "train_start", "train_end", "val_start", "val_end", "rmse", "mape"]])
 
 print("\nCV average:")
 print("RMSE mean:", results_df["rmse"].mean(), " / std:", results_df["rmse"].std())

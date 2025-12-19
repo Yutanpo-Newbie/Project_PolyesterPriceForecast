@@ -35,7 +35,6 @@ target_col = "log_Polyester_yarn_price"
 # feature values
 feature_cols = [
     "log_Polyester_yarn_price_lag1",
-    "hs61_Vietnam_ExpPrice",
     "log_PTA_price",
     "log_MEG_price",
     "log_Global_clothing_export",
@@ -47,7 +46,7 @@ feature_cols = [
 X = df_lag[feature_cols]
 y = df_lag[target_col]
 
-def make_model():
+def  make_model():
     return XGBRegressor(
         objective="reg:squarederror",
         n_estimators=300,
@@ -59,7 +58,7 @@ def make_model():
     )
 
 # Cross Validation
-n_splits = 5 
+n_splits  = 5
 tscv = TimeSeriesSplit(n_splits=n_splits)
 
 fold_results = []

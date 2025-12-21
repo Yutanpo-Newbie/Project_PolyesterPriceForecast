@@ -4,7 +4,7 @@ import numpy as np
 
 
 class BaseModel(ABC):
-    """モデルの基底クラス"""
+    """モデルのBaseクラス"""
 
     def __init__(self):
         self.model = None

@@ -25,6 +25,16 @@ def load_config(config_name: str = "config.yaml") -> dict:
     return config
 
 def run_experiment(config_name: str, experiment_name: str) -> pd.DataFrame:
+    """
+    実験を実行して結果を返す
+    
+    Args:
+        config_name: 設定ファイル名
+        experiment_name: 実験名（結果に付与）
+    
+    Returns:
+        結果のDataFrame
+    """
     print("\n" + "=" * 80)
     print(f"Experiment: {experiment_name}")
     print(f"Config: {config_name}")
@@ -58,21 +68,34 @@ def run_experiment(config_name: str, experiment_name: str) -> pd.DataFrame:
     )
     X, y = feature_eng.split_features_target(df_processed)
     
-    print(f"Features used ({len(X.columns)}): {list(X.columns)}")
+    print(f"Features ({len(X.columns)}): {list(X.columns)}")
+    
+    # モデルパラメータを表示
+    model_params = config['model']['xgboost']
+    print(f"Model params:")
+    print(f"  n_estimators={model_params['n_estimators']}")
+    print(f"  learning_rate={model_params['learning_rate']}")
+    print(f"  max_depth={model_params['max_depth']}")
+    print(f"  subsample={model_params.get('subsample', 1.0)}")
+    print(f"  colsample_bytree={model_params.get('colsample_bytree', 1.0)}")
     
     # モデル評価
     evaluator = ModelEvaluator(n_splits=config['evaluation']['n_splits'])
     results = evaluator.cross_validate(
         model_class=XGBoostModel,
-        model_params=config['model']['xgboost'],
+        model_params=model_params,
         X=X,
         y=y,
         df_dates=df_processed['Date']
     )
     
-    # 実験名を追加
+    # 実験情報を追加
     results['experiment'] = experiment_name
+    results['config_file'] = config_name
     results['n_features'] = len(X.columns)
+    results['n_estimators'] = model_params['n_estimators']
+    results['learning_rate'] = model_params['learning_rate']
+    results['max_depth'] = model_params['max_depth']
     
     return results
 
@@ -81,20 +104,33 @@ def compare_experiments():
     
     experiments = [
         {
+            'config': 'config_base.yaml',
+            'name': 'Baseline (default params, 7 features)'
+        },
+        {
             'config': 'config.yaml',
-            'name': 'Full Features (7 features)'
+            'name': 'Tuned (optimized params, 7 features)'
         },
         {
             'config': 'config_reduced.yaml',
-            'name': 'Reduced Features (5 features)'
+            'name': 'Reduced (optimized params, 5 features)'
         }
     ]
     
     all_results = []
     
     for exp in experiments:
-        results = run_experiment(exp['config'], exp['name'])
-        all_results.append(results)
+        try:
+            results = run_experiment(exp['config'], exp['name'])
+            all_results.append(results)
+        except FileNotFoundError as e:
+            print(f"\n⚠️  Warning: {e}")
+            print(f"   Skipping: {exp['name']}")
+            continue
+    
+    if not all_results:
+        print("\n❌ No experiments completed!")
+        return None
     
     # 結果を結合
     combined_results = pd.concat(all_results, ignore_index=True)
@@ -104,10 +140,13 @@ def compare_experiments():
     print("COMPARISON SUMMARY")
     print("=" * 80)
     
-    summary = combined_results.groupby('experiment').agg({
+    summary = combined_results.groupby(['experiment', 'config_file']).agg({
         'rmse': ['mean', 'std'],
         'mape': ['mean', 'std'],
-        'n_features': 'first'
+        'n_features': 'first',
+        'n_estimators': 'first',
+        'learning_rate': 'first',
+        'max_depth': 'first'
     }).round(4)
     
     print(summary)
@@ -119,30 +158,53 @@ def compare_experiments():
     
     for exp_name in combined_results['experiment'].unique():
         exp_data = combined_results[combined_results['experiment'] == exp_name]
-        print(f"\n{exp_name}:")
-        print(f"  RMSE: {exp_data['rmse'].mean():.4f} ± {exp_data['rmse'].std():.4f}")
-        print(f"  MAPE: {exp_data['mape'].mean():.2f}% ± {exp_data['mape'].std():.2f}%")
-        print(f"  Features: {exp_data['n_features'].iloc[0]}")
+        print(f"\n📊 {exp_name}:")
+        print(f"   Config: {exp_data['config_file'].iloc[0]}")
+        print(f"   RMSE: {exp_data['rmse'].mean():.4f} ± {exp_data['rmse'].std():.4f}")
+        print(f"   MAPE: {exp_data['mape'].mean():.2f}% ± {exp_data['mape'].std():.2f}%")
+        print(f"   Features: {exp_data['n_features'].iloc[0]}")
+        print(f"   Params: n_est={exp_data['n_estimators'].iloc[0]}, "
+              f"lr={exp_data['learning_rate'].iloc[0]}, "
+              f"depth={exp_data['max_depth'].iloc[0]}")
     
-    # 改善率を計算
-    full_rmse = combined_results[combined_results['experiment'] == 'Full Features (7 features)']['rmse'].mean()
-    reduced_rmse = combined_results[combined_results['experiment'] == 'Reduced Features (5 features)']['rmse'].mean()
+    # ベースラインとの比較
+    baseline_data = combined_results[combined_results['experiment'].str.contains('Baseline')]
     
-    improvement = ((full_rmse - reduced_rmse) / full_rmse) * 100
-    
-    print("\n" + "=" * 80)
-    print("IMPACT ANALYSIS")
-    print("=" * 80)
-    if improvement > 0:
-        print(f"Removing 2 features IMPROVED performance by {improvement:.2f}%")
-    else:
-        print(f"Removing 2 features DEGRADED performance by {abs(improvement):.2f}%")
+    if not baseline_data.empty:
+        baseline_rmse = baseline_data['rmse'].mean()
+        baseline_mape = baseline_data['mape'].mean()
+        
+        print("\n" + "=" * 80)
+        print("IMPROVEMENT vs BASELINE")
+        print("=" * 80)
+        
+        for exp_name in combined_results['experiment'].unique():
+            if 'Baseline' in exp_name:
+                continue
+            
+            exp_data = combined_results[combined_results['experiment'] == exp_name]
+            exp_rmse = exp_data['rmse'].mean()
+            exp_mape = exp_data['mape'].mean()
+            
+            rmse_improvement = ((baseline_rmse - exp_rmse) / baseline_rmse) * 100
+            mape_improvement = ((baseline_mape - exp_mape) / baseline_mape) * 100
+            
+            print(f"\n{exp_name}:")
+            if rmse_improvement > 0:
+                print(f"  RMSE: ✓ IMPROVED by {rmse_improvement:.2f}%")
+            else:
+                print(f"  RMSE: ✗ DEGRADED by {abs(rmse_improvement):.2f}%")
+            
+            if mape_improvement > 0:
+                print(f"  MAPE: ✓ IMPROVED by {mape_improvement:.2f}%")
+            else:
+                print(f"  MAPE: ✗ DEGRADED by {abs(mape_improvement):.2f}%")
     
     # 結果をCSVに保存
     output_path = PROJECT_ROOT / "results" / "feature_comparison.csv"
     output_path.parent.mkdir(exist_ok=True)
     combined_results.to_csv(output_path, index=False)
-    print(f"\nResults saved to: {output_path}")
+    print(f"\n📊 Results saved to: {output_path}")
     
     return combined_results
 

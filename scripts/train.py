@@ -12,6 +12,7 @@ from src.features.feat_engineering import FeatureEngineering
 from src.models.xgboost_model import XGBoostModel
 from src.evaluation.metrics import ModelEvaluator
 
+
 def load_config(config_name: str = "config.yaml") -> dict:
     """設定ファイルを読み込む"""
     config_path = PROJECT_ROOT / "config" / config_name

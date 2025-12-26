@@ -1,0 +1,37 @@
+data:
+  raw_data_path: "data/raw/AllData_PolyesterForecast.csv"
+  processed_data_path: "data/processed/"
+
+features:
+  log_columns:
+    - "Polyester_yarn_price"
+    - "PTA_price"
+    - "MEG_price"
+    - "Global_clothing_export"
+    - "Global Price of Cotton (US Cents/lb)"
+    - "usd2vnd_exchange_monthly_avg_rate"
+    - "brent_oil_price_monthly_avg_rate"
+  
+  feature_columns:
+    - "log_Polyester_yarn_price_lag1"
+    - "log_PTA_price"
+    - "log_MEG_price"
+    # - "log_Global_clothing_export"              
+    # - "log_Global Price of Cotton (US Cents/lb)" 
+    - "log_usd2vnd_exchange_monthly_avg_rate"
+    - "log_brent_oil_price_monthly_avg_rate"
+  
+  target_column: "log_Polyester_yarn_price"
+
+model:
+  xgboost:
+    objective: "reg:squarederror"
+    n_estimators: 300
+    learning_rate: 0.05
+    max_depth: 4
+    subsample: 0.9
+    colsample_bytree: 0.9
+    random_state: 42
+
+evaluation:
+  n_splits: 5

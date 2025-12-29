@@ -108,12 +108,16 @@ def compare_experiments():
             'name': 'Baseline (default params, 7 features)'
         },
         {
-            'config': 'config.yaml',
-            'name': 'Tuned (optimized params, 7 features)'
+            'config': 'config_noLag1.yaml',
+            'name': 'No lag1 feature (default params, 6 features)'
         },
         {
-            'config': 'config_reduced.yaml',
-            'name': 'Reduced (optimized params, 5 features)'
+            'config': 'config_noDemand.yaml',
+            'name': 'no Demand features (default params, 5 features)'
+        },
+        {
+            'config': 'config_noDemand_Lag1.yaml',
+            'name': 'no Demand & Lag1 features (default params, 4 features)'
         }
     ]
     
@@ -124,12 +128,12 @@ def compare_experiments():
             results = run_experiment(exp['config'], exp['name'])
             all_results.append(results)
         except FileNotFoundError as e:
-            print(f"\n⚠️  Warning: {e}")
+            print(f"\n  Warning: {e}")
             print(f"   Skipping: {exp['name']}")
             continue
     
     if not all_results:
-        print("\n❌ No experiments completed!")
+        print("\n No experiments completed!")
         return None
     
     # 結果を結合
@@ -158,7 +162,7 @@ def compare_experiments():
     
     for exp_name in combined_results['experiment'].unique():
         exp_data = combined_results[combined_results['experiment'] == exp_name]
-        print(f"\n📊 {exp_name}:")
+        print(f"\n {exp_name}:")
         print(f"   Config: {exp_data['config_file'].iloc[0]}")
         print(f"   RMSE: {exp_data['rmse'].mean():.4f} ± {exp_data['rmse'].std():.4f}")
         print(f"   MAPE: {exp_data['mape'].mean():.2f}% ± {exp_data['mape'].std():.2f}%")
@@ -204,7 +208,7 @@ def compare_experiments():
     output_path = PROJECT_ROOT / "results" / "feature_comparison.csv"
     output_path.parent.mkdir(exist_ok=True)
     combined_results.to_csv(output_path, index=False)
-    print(f"\n📊 Results saved to: {output_path}")
+    print(f"\n Results saved to: {output_path}")
     
     return combined_results
 
